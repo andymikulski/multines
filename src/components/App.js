@@ -10,6 +10,8 @@ import {
   Position,
 } from '@blueprintjs/core';
 
+
+import nES6 from '../../../nES6/src/nES6';
 import Socket from './Socket';
 
 import logo from '../assets/nes.png';
@@ -23,12 +25,21 @@ class App extends Component {
       hasPlayerOverlay: false,
       hasTechInfo: false,
       hasHelpOverlay: false,
-      hasDibs: false,
 
       isPlaying: false,
+      romName: null,
 
       ioBroken: false,
       brokenReason: null,
+
+      isInQueue: false,
+      queueNumber: 0,
+      totalQueue: 0,
+      totalAudience: 0,
+      timeLeft: 0,
+      isPlayerOne: false,
+
+      socket: null,
     };
 
     this.togglePlayerOverlay = this.toggleFactory('PlayerOverlay');
@@ -36,7 +47,18 @@ class App extends Component {
     this.toggleHelpOverlay = this.toggleFactory('HelpOverlay');
 
     this.handleBrokenSocket = ::this.handleBrokenSocket;
+    this.handleSetSocket = ::this.handleSetSocket;
     this.handleRomLoad = ::this.handleRomLoad;
+    this.handleDibs = ::this.handleDibs;
+    this.handleQueueUpdate = ::this.handleQueueUpdate;
+    this.updateTimeLeft = ::this.updateTimeLeft;
+  }
+
+  componentWillMount() {
+    this.nes = new nES6({
+      render: 'headless',
+    });
+    this.nes.start();
   }
 
   toggleFactory(prop) {
@@ -49,6 +71,50 @@ class App extends Component {
     };
   }
 
+  handleQueueUpdate({ isInQueue, place, total, audience, timeLeft }) {
+    this.setState({
+      isInQueue,
+      isPlayerOne: isInQueue && place === 1,
+      queueNumber: place,
+      totalQueue: total,
+      totalAudience: audience,
+      timeLeft,
+    });
+
+    if (!!timeLeft && !this.timeLeftTimer) {
+      this.timeLeftTimer = setTimeout(this.updateTimeLeft, 1000);
+    }
+  }
+
+  updateTimeLeft(){
+    this.setState({
+      timeLeft: this.state.timeLeft > 0 ? this.state.timeLeft - 1 : 0,
+    });
+
+    if (this.state.timeLeft > 0) {
+      this.timeLeftTimer = setTimeout(this.updateTimeLeft, 1000);
+    } else {
+      clearTimeout(this.timeLeftTimer);
+      this.timeLeftTimer = null;
+    }
+  }
+
+  handleDibs() {
+    const {
+      socket,
+    } = this.state;
+
+    if (!socket) {
+      return;
+    }
+
+    if (!this.state.isInQueue) {
+      socket.emit('queue:join');
+    } else {
+      socket.emit('queue:leave');
+    }
+  }
+
   handleBrokenSocket(reason) {
     this.setState({
       ioBroken: true,
@@ -56,42 +122,90 @@ class App extends Component {
     });
   }
 
-  handleRomLoad() {
+  handleRomLoad(romName) {
     this.setState({
       isPlaying: true,
+      romName,
+    });
+  }
+
+  handleSetSocket(socket) {
+    this.setState({
+      socket
     });
   }
 
   render() {
+    const {
+      isInQueue,
+      isPlayerOne,
+      queueNumber,
+      totalQueue,
+      totalAudience,
+      timeLeft,
+      romName,
+    } = this.state;
+
+    const dateLeft = new Date(null);
+    dateLeft.setSeconds(timeLeft);
+    const displayedTime = dateLeft.toISOString().substr(14, 5);
+
     return (
       <div className="App">
         <nav className="pt-navbar pt-dark">
           <div className="pt-navbar-group pt-align-left">
             <img role="presentation" src={ logo } className="logo" />
-            <div className="pt-navbar-heading">MultiNES</div>
+            <div className="pt-navbar-heading">MultiNES
+            {
+              romName &&
+              <small>
+                <span className="pt-navbar-divider" />
+                {romName}
+              </small>
+            }
+            </div>
           </div>
           {
             !this.state.ioBroken ?
             <div className="pt-navbar-group pt-align-right">
-              <Button disabled className="pt-minimal pt-icon-time" text={'2:34'} />
-              <Button disabled className="pt-minimal pt-icon-people" text={`${this.state.hasDibs ? '4 / ' : ''}15`} />
+              <Button disabled className="pt-minimal pt-icon-time" text={displayedTime} />
+              <Button
+                disabled
+                className="pt-minimal pt-icon-people"
+                text={`${isInQueue ? `${queueNumber} / ` : ''}${totalQueue}`}
+              />
+              <Button
+                disabled
+                className="pt-minimal pt-icon-eye-open"
+                text={`${totalAudience}`}
+              />
 
-              <Popover content={<div>
-                  { this.state.hasDibs &&
+              <Popover content={
+                <div>
+                  {
+                    isPlayerOne &&
                     <div>
-                      You are number <b>4</b> in line.<br /><br />
+                      You're currently playing!
                     </div>
                   }
-                  <div>
-                    There are <b>15</b> people waiting in line.<br /><br />
-                    Estimated wait time is <b>5 minutes</b>
-                  </div>
+                  { isInQueue && !isPlayerOne ?
+                    <div>
+                      You are number <b>{ queueNumber }</b> in line.<br /><br />
+                      There are <b>{totalQueue}</b> people waiting in line.<br /><br />
+                      Your estimated wait time is <b>{(queueNumber - 1) * 2} minutes</b>
+                    </div>
+                    :
+                    <div>
+                      There are <b>{totalQueue}</b> people waiting in line.<br /><br />
+                      Estimated wait time is <b>{totalQueue * 2} minutes</b>
+                    </div>
+                  }
                 </div>}
                 interactionKind={PopoverInteractionKind.HOVER}
                 popoverClassName="pt-popover-content-sizing"
                 position={Position.BOTTOM_RIGHT.toString()}
                 useSmartPositioning={false}>
-                  <Button className={`pt-minimal pt-icon-hand ${ this.state.hasDibs ? 'pt-active' : ''}`} text={'Get in line'} onClick={()=>{ this.setState({ hasDibs: !this.state.hasDibs }) }} />
+                  <Button className={`pt-minimal pt-icon-hand ${ isInQueue ? 'pt-active' : ''}`} text={isPlayerOne ? 'NOW PLAYING' : (isInQueue ? 'Leave queue' : 'Get in line')} onClick={this.handleDibs} />
               </Popover>
 
               <span className="pt-navbar-divider" />
@@ -134,8 +248,10 @@ class App extends Component {
           this.state.ioBroken && !this.state.isPlaying &&
           <div className="broken-io">
             <img role="presentation" src={kingHippo} className="king-hippo" />
-            <h3>Oh no!</h3>
-            { this.state.brokenReason }<br /><br />
+            <h3>Oh no!
+              <small>Our multiplayer server appears to be down!</small>
+              <small>({ this.state.brokenReason })</small>
+            </h3>
             <span>You can still drag-n-drop ROMs onto the page to play single-player, though.</span>
           </div>
         }
@@ -191,16 +307,21 @@ class App extends Component {
                 </div>
             </div>
         </Dialog>
-        <Socket onRomLoad={this.handleRomLoad} onBrokenSocket={this.handleBrokenSocket} />
+        <Socket
+          nes={this.nes}
+          isPlayerOne={this.state.isPlayerOne}
+          setSocket={this.handleSetSocket}
+          onQueueUpdate={this.handleQueueUpdate}
+          onRomLoad={this.handleRomLoad}
+          onBrokenSocket={this.handleBrokenSocket}
+        />
       </div>
     );
   }
 }
 
 
-const mapStateToProps = (state) => ({
-  player: {},
-});
+const mapStateToProps = (state) => ({});
 
 const mapDispatchToProps = (dispatch) => {
   return {

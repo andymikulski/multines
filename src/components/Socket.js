@@ -1,10 +1,11 @@
 import React from 'react';
-import LZString from 'lz-string';
+import { connect } from 'react-redux';
 
-import nES6 from '../../../nES6/src/nES6';
+import LZString from 'lz-string';
 import bindKeyboardPlugin from '../../../nES6/src/plugins/bindKeyboard';
 import dragDropLoader from '../../../nES6/src/plugins/dragDropLoader';
 import blurPausePlugin from '../../../nES6/src/plugins/blurPausePlugin';
+
 
 class Socket extends React.Component {
 
@@ -18,68 +19,91 @@ class Socket extends React.Component {
       cb(JSON.parse(LZString.decompressFromUTF16(data)));
   };
 
+  triggerBrokenSocket(){
+    this.props.nes.addPlugins([
+      dragDropLoader({
+        onRomLoad: ::this.handleSingleRomLoad,
+      }),
+    ]);
+
+    if (this.props.onBrokenSocket) {
+      this.props.onBrokenSocket(`No sockets available to connect to server!`);
+    }
+  }
+
   setupSocket() {
     if (!window.io) {
-      if (this.props.onBrokenSocket) {
-        this.props.onBrokenSocket(`No sockets available to connect to server!`);
-      }
+      this.triggerBrokenSocket();
       return;
     }
+
+    const {
+      nes,
+    } = this.props;
+
     const io = window.io;
     const socket = io('//localhost:3001/', {
       transports: ['websocket'],
     });
 
-    this.nes.addPlugins([
+    nes.addPlugins([
       bindKeyboardPlugin({
-        onPress: ({ joypadButton }) =>
-          socket.emit('input:down', joypadButton),
-        onDepress: ({ joypadButton }) =>
-          socket.emit('input:up', joypadButton),
-      })
+        onMiddlePress: ({ joypadButton, next }) =>{
+          if (this.props.isPlayerOne) {
+            socket.emit('input:down', joypadButton);
+            next();
+          }
+        },
+        onMiddleDepress: ({ joypadButton, next }) => {
+          if (this.props.isPlayerOne) {
+            socket.emit('input:up', joypadButton);
+            next();
+          }
+        },
+      }),
     ]);
-    this.nes.setRenderer('auto');
+    nes.setRenderer('auto');
 
     // socket.on('connect', (...data)=>{});
     // socket.on('disconnect', (...data)=>{});
 
     // incoming
     socket.on('rom:data', Socket.deserialize(({ rom, name })=>{
-      this.nes.loadRomFromBinary(rom.data, name);
+      nes.loadRomFromBinary(rom.data, name);
+      this.props.onRomLoad && this.props.onRomLoad(name);
+
+      socket.emit('rom:loaded');
     }));
 
-    socket.on('state:update', Socket.deserialize(::this.nes.importState));
+    socket.on('state:update', Socket.deserialize(::nes.importState));
 
     socket.on('input:down', Socket.deserialize(joypadButton =>
-      this.nes.pressControllerButton(0, joypadButton)));
+      nes.pressControllerButton(0, joypadButton)));
 
     socket.on('input:up', Socket.deserialize(joypadButton =>
-      this.nes.depressControllerButton(0, joypadButton)));
+      nes.depressControllerButton(0, joypadButton)));
+
+    socket.on('queue:update', Socket.deserialize(this.props.onQueueUpdate));
 
     // outgoing
-    socket.on('state:request', () => socket.emit('state:update', this.nes.exportState()));
+    socket.on('state:request', () => socket.emit('state:update', nes.exportState()));
+
+    this.props.setSocket(socket);
+
   }
 
-  handleSinglePlayerRom() {
-    this.props.onRomLoad && this.props.onRomLoad();
+  handleSingleRomLoad(romName) {
+    const {
+      nes,
+    } = this.props;
+
+    this.props.onRomLoad && this.props.onRomLoad(romName);
     // add some plugins to make single-player a little nicer
-    this.nes.addPlugins([
+    nes.addPlugins([
       bindKeyboardPlugin(),
       blurPausePlugin()
     ]);
-    this.nes.setRenderer('auto');
-  }
-
-  componentWillMount() {
-    this.nes = new nES6({
-      render: 'headless',
-      plugins: [
-        dragDropLoader({
-          onRomLoad: ::this.handleSinglePlayerRom,
-        }),
-      ],
-    });
-    this.nes.start();
+    nes.setRenderer('auto');
   }
 
   componentDidMount() {
@@ -91,4 +115,13 @@ class Socket extends React.Component {
   }
 }
 
-export default Socket;
+const mapStateToProps = (state) => ({
+  socket: state.socket,
+});
+
+const mapDispatchToProps = (dispatch) => ({});
+
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(Socket);

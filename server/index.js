@@ -1,134 +1,206 @@
-var LZString = require('lz-string');
-var sizeof = require('object-sizeof');
-var md5 = require('md5');
+var fs = require('fs');
+var path = require('path');
+
+const utils = require('./utils.js');
+var emitTo = utils.emitTo;
+var addIncomingBandwidth = utils.addIncomingBandwidth;
 
 var io = require('socket.io')({
 	transports: ['websocket'],
 });
 
-var serialize = function(obj) {
-	return LZString.compressToUTF16(JSON.stringify(obj));
+
+let currentRom = {};
+const loadRom = (name, path)=>{
+	return new Promise((resolve, reject) => {
+		fs.readFile(path, (err, data) => {
+		  if (err) {
+		    return reject(err);
+		  }
+
+		  console.log(`ROM "${name}" loaded! (${data.toString().length / 1000} KB)`);
+		  currentRom = {
+		  	name,
+		  	data,
+		  };
+		  resolve(currentRom);
+		});
+	});
+}
+
+const sendIndividualRom = (target, ip)=>{
+	if (!currentRom.data || !currentRom.data.length) {
+		console.log('no currentRom data');
+		return;
+	}
+
+	emitTo(target,
+		'rom:data',
+		{
+			rom: currentRom.data,
+			name: currentRom.name,
+		},
+		`Sending ROM data ${!!ip ? `to ${ip}` : ''}`
+	);
+}
+
+const sendRomToPlayers = ({ name, data })=>{
+	const connections = connected || [];
+
+	connections.forEach(ip => {
+		const socket = socketRoster[ip].socket;
+		if (socket) {
+			sendIndividualRom(socket, ip);
+		}
+	});
 };
 
-var deserialize = function(str) {
-	return JSON.parse(LZString.decompressFromUTF16(str));
+loadRom('Super Mario Bros.',
+	path.resolve(__dirname, '../../nES6/src/roms/SuperMarioBros.nes'))
+	.then(sendRomToPlayers);
+
+
+
+var playerQueue = [];
+var connected = [];
+var socketRoster = {};
+var playerInfoRoster = {};
+var lastState;
+var timeStart;
+
+var minsPerTurn = 2;
+
+const getTimeLeft = ()=>{
+	const elapsedTime = timeStart ? (Date.now() - timeStart) : 0;
+	const timeLeft = (minsPerTurn * 60) - elapsedTime;
+	return playerQueue.length ? timeLeft : 0;
 };
 
-// var nES6 = require('../../src/nES6.js');
-
-// var nes = new nES6({
-// 	render: 'headless',
-//     audio: false,
-// });
-
-var fs = require('fs');
-var path = require('path');
-let romData;
-// const rom = '../../app/roms/TecmoSuperBowl2k17.nes';
-const romName = 'Super Mario Bros.';
-const romPath = path.resolve(__dirname, '../../nES6/src/roms/SuperMarioBros.nes');
-console.log(`Loading ${romPath}...`);
-fs.readFile(romPath, (err, data) => {
-  if (err) {
-    throw err;
-  }
-  console.log('\tROM loaded!', `${data.toString().length / 1000} KB`);
-  romData = data;
+var getPlaceInfo = ip => ({
+	timeLeft: getTimeLeft(),
+	isInQueue: playerQueue.indexOf(ip) !== -1,
+	place: playerQueue.indexOf(ip) + 1,
+	total: playerQueue.length,
+	audience: connected.length,
 });
 
-var firstPlayer;
-var clients = {};
-var clientOrder = [];
-
-var sentBandwidth = 0;
-var receivedBandwidth = 0;
-
-var getNumClients = () => clientOrder.length;
-
-var emitTo = (socket, action, data, summary, broadcast)=>{
-	const compressedData = serialize(data);
-	const originalSize = (sizeof(data) + sizeof(action)) / 1000;
-	const outgoingSize = (sizeof(compressedData) + sizeof(action)) / 1000;
-	const audienceSize = broadcast ? getNumClients() - 1 : 1;
-	sentBandwidth += outgoingSize;
-
-	console.log(`
-${summary || 'Emitting data...'}
-MD5:\t${!!data ? md5(compressedData) : ''}
-Original size:\t${originalSize} KB
-Compressed size:\t${outgoingSize} KB
-Audience count:\t${audienceSize}
-Outgoing: ${outgoingSize * audienceSize} KB
-
-TOTAL INBOUND: ${receivedBandwidth.toFixed(2)} KB
-TOTAL OUTBOUND: ${sentBandwidth.toFixed(2)} KB
-`);
-
-	socket.emit(action, compressedData);
+const updateAllQueues = ()=>{
+	connected.forEach(ip => {
+		emitTo(socketRoster[ip].socket, 'queue:update', getPlaceInfo(ip), `Emitting queue:update to ${ip}`);
+	});
 };
 
-io.on('connection', (socket) =>{
-	clients[socket.id] = socket;
-	clientOrder.push(socket.id);
+let lastFirstPlayer;
+setInterval(()=>{
+	if (playerQueue.length > 0){
+		let firstPlayer = playerQueue[0];
+		let playerSocket = socketRoster[firstPlayer].socket;
 
-	if (!firstPlayer || !firstPlayer.connected) {
-		firstPlayer = socket;
+		const newFirst = lastFirstPlayer !== firstPlayer;
+		lastFirstPlayer = firstPlayer;
+		if (newFirst) {
+			timeStart = Date.now();
+		} else if (getTimeLeft() <= 0) {
+			playerSocket = null;
+			timeStart = null;
+		}
 
-		((firstPlayer)=>{
-			setInterval(()=>{
-				if (getNumClients() - 1 > 0){
-					firstPlayer && emitTo(firstPlayer, 'state:request', null, 'Requesting: P1 State');
-				}
-			}, 2500);
-		})(socket);
+		while (playerQueue.length && (!playerSocket || !playerSocket.connected)) {
+			playerQueue.pop();
+
+			firstPlayer = playerQueue[0];
+			playerSocket = socketRoster[firstPlayer] && socketRoster[firstPlayer].socket;
+			timeStart = Date.now();
+		}
+
+		firstPlayer && emitTo(playerSocket, 'state:request', null, 'Requesting: P1 State');
+		updateAllQueues();
 	}
+}, 2500);
+
+setInterval(updateAllQueues, 1000);
+
+io.on('connection', (socket) =>{
+	const socketIp = `${socket.handshake.address}-${socket.id}`;
+	connected.push(socketIp);
+	console.log(`new connection - ${socketIp}`);
 
 	socket.on('disconnect', ()=>{
-		if (!firstPlayer || firstPlayer.id === socket.id) {
-			firstPlayer = null
-
-			if (clientOrder.length > 1){
-				var nextId = clientOrder.shift();
-				firstPlayer = clients[nextId];
-				console.log('new first player', nextId);
-			}
+		const idx = connected.indexOf(socketIp);
+		if (idx > -1) {
+			connected.splice(idx, 1);
 		}
-		delete clients[socket.id];
+
+		const playerIndex = playerQueue.indexOf(socketIp);
+		if (playerIndex > -1) {
+			playerQueue.splice(playerIndex, 1);
+		}
+
+		if(lastFirstPlayer === socketIp){
+			timeStart = null;
+		}
+
+		updateAllQueues();
 	});
 
-	console.log('connected', socket.id);
-	if(romData) {
-		emitTo(socket, 'rom:data', { rom: romData, name: romName }, 'Sending ROM data');
-	}
+	socketRoster[socketIp] = Object.assign({}, socketRoster[socketIp]);
+	socketRoster[socketIp].socket = socket;
 
 	// when the client emits 'new message', this listens and executes
 	socket.on('input:down', (data) => {
-		receivedBandwidth += sizeof(data) / 1000;
-		if (firstPlayer && firstPlayer.id !== socket.id) {
-			return;
-		}
-      	// this.nes.pressControllerButton(0, joypadButton);
+		addIncomingBandwidth(data);
       	emitTo(socket.broadcast, 'input:down', data, 'Emitting input:down', true);
 	});
 
 	socket.on('input:up', (data) => {
-		receivedBandwidth += sizeof(data) / 1000;
-		if (firstPlayer && firstPlayer.id !== socket.id) {
-			return;
-		}
-
-      	// this.nes.depressControllerButton(0, joypadButton);
+		addIncomingBandwidth(data);
       	emitTo(socket.broadcast, 'input:up', data, 'Emitting input:up', true);
 	});
 
 	socket.on('state:update', (state)=>{
-		receivedBandwidth += sizeof(state) / 1000;
-		if (getNumClients() - 1 <= 0) {
+		addIncomingBandwidth(state);
+		lastState = Object.assign({}, state);
+
+		if (connected.length <= 0) {
 			return;
 		}
 
       	emitTo(socket.broadcast, 'state:update', state, 'Emitting state:update', true);
 	});
+
+	socket.on('queue:join', ()=>{
+		if (playerQueue.indexOf(socketIp) === -1) {
+			console.log(`${socketIp} joined the queue`);
+			playerQueue.push(socketIp);
+			emitTo(socket, 'queue:update', getPlaceInfo(socketIp));
+			updateAllQueues();
+		}
+	});
+
+	socket.on('queue:leave', ()=>{
+		const idx = playerQueue.indexOf(socketIp);
+		if (idx > -1) {
+			console.log(`${socketIp} left the queue`);
+			playerQueue.splice(idx, 1);
+			updateAllQueues();
+		}
+	});
+
+	socket.on('queue:status', ()=>{
+		emitTo(socket, 'queue:update', getPlaceInfo(socketIp));
+	});
+
+	socket.on('rom:loaded', ()=>{
+		if (lastState) {
+	  		emitTo(socket, 'state:update', lastState, 'Emitting state:update', true);
+		}
+	});
+
+	// if we have a loaded rom, send it down the line
+	sendIndividualRom(socket, socketIp);
+
+	// update with the last saved state
+	emitTo(socket, 'queue:update', getPlaceInfo(socketIp));
 });
 
 io.listen(3001, ()=>{

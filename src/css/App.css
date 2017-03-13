@@ -62,7 +62,22 @@ body {
   margin-bottom: calc(1em + 2vmin);
 }
 .broken-io span {
+  color: #fff;
+}
+
+.broken-io h3 small {
+  margin-top: 0.5em;
+}
+
+.broken-io small {
+  display: block;
+  margin: 0;
+  font-size: 0.75em;
+}
+.broken-io small + small {
+  font-weight: 400;
   color: #5C7080;
+  font-size: 0.5em;
 }
 
 .nes6-player {
