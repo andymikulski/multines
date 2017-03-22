@@ -2,25 +2,48 @@ var fs = require('fs');
 var path = require('path');
 var md5 = require('md5');
 
-const utils = require('./utils.js');
+var utils = require('./utils.js');
 var emitTo = utils.emitTo;
 var loadRom = utils.loadRom;
 var addIncomingBandwidth = utils.addIncomingBandwidth;
+
+/*
+	███████╗███████╗████████╗██╗   ██╗██████╗
+	██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
+	███████╗█████╗     ██║   ██║   ██║██████╔╝
+	╚════██║██╔══╝     ██║   ██║   ██║██╔═══╝
+	███████║███████╗   ██║   ╚██████╔╝██║
+	╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝
+*/
 
 var io = require('socket.io')({
 	transports: ['websocket'],
 });
 
+// Game info
 var playerQueue = [];
 var connected = [];
 var socketRoster = {};
 var lastState;
 var timeStart;
-
-const minsPerTurn = 2;
-
+var minsPerTurn = 2;
 var currentRom = {};
-const sendRomToPlayer = (target, socketId)=>{
+
+var currentPlayers = {
+	0: null,
+	1: null,
+	// nES6 doesn't support fourscore yet
+	// 2: null,
+	// 3: null,
+};
+
+/**
+ * Send binary ROM data to a target socket.
+ *
+ * @param  {Socket} target    Socket to send the data to.
+ * @param  {string} targetId? Optional ID of target (for debugging)
+ */
+function transmitRom(target, targetId) {
 	if (!currentRom.data || !currentRom.data.length) {
 		console.log('no currentRom data');
 		return;
@@ -32,144 +55,175 @@ const sendRomToPlayer = (target, socketId)=>{
 			rom: currentRom.data,
 			name: currentRom.name,
 		},
-		`Sending ROM data ${!!socketId ? `to ${socketId}` : ''}`
+		`Sending ROM data ${!!targetId ? `to ${targetId}` : ''}`
 	);
 }
 
-const sendRomToPlayers = (rom)=>{
+/**
+ * Transmit ROM data to all connected sockets (audience + players).
+ *
+ * @param  {Object}  rom Object containing rom `name` and its binary `data`
+ * @return {Promise}
+ */
+function sendRomToConnected(rom) {
 	return new Promise((resolve)=>{
 		var name = rom.name;
 		var data = rom.data;
 
-		const connections = connected || [];
+		var connections = connected || [];
 
 		connections.forEach(socketId => {
-			const socket = socketRoster[socketId].socket;
+			var socket = socketRoster[socketId].socket;
 			if (socket) {
-				sendRomToPlayer(socket, socketId);
+				transmitRom(socket, socketId);
 			}
 		});
 
 		resolve({ name, data });
 	});
-};
+}
 
 
-const getTurnTimeRemaining = ()=>{
-	const elapsedTime = timeStart ? (Date.now() - timeStart) : 0;
-	const timeLeft = (minsPerTurn * 60) - elapsedTime;
-	return playerQueue.length ? timeLeft : 0;
-};
-
-var getGameStateInfo = socketId => ({
-	timeLeft: getTurnTimeRemaining(),
-	total: playerQueue.length,
-	audience: connected.length,
-	isInQueue: playerQueue.indexOf(socketId) !== -1,
-	place: playerQueue.indexOf(socketId) + 1,
-});
-
-const updateAllGameStates = ()=>{
-	connected.forEach(socketId => {
-		emitTo(socketRoster[socketId].socket, 'info:update', getGameStateInfo(socketId), `Emitting info:update to ${socketId}`);
-	});
-};
-
-
-var currentPlayers = [];
-
-
-// audience/connections
-const removeConnection = (socketId) => {
+/*
+	 █████╗ ██╗   ██╗██████╗ ██╗███████╗███╗   ██╗ ██████╗███████╗
+	██╔══██╗██║   ██║██╔══██╗██║██╔════╝████╗  ██║██╔════╝██╔════╝
+	███████║██║   ██║██║  ██║██║█████╗  ██╔██╗ ██║██║     █████╗
+	██╔══██║██║   ██║██║  ██║██║██╔══╝  ██║╚██╗██║██║     ██╔══╝
+	██║  ██║╚██████╔╝██████╔╝██║███████╗██║ ╚████║╚██████╗███████╗
+	╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝╚══════╝╚═╝  ╚═══╝ ╚═════╝╚══════╝
+*/
+function removeConnection(socketId) {
 	connected = connected.filter(id => id === socketId);
-};
-const addConnection = (socketId) => {
+}
+function addConnection(socketId) {
 	if (connected.indexOf(socketId) === -1) {
 		connected.push(socketId);
 	}
-};
-const updateSocketRoster = (socketId, socket) =>{
+}
+function updateSocketRoster(socketId, socket) {
 	socketRoster[socketId] = Object.assign({}, socketRoster[socketId]);
 	socketRoster[socketId].socket = socket;
 }
 
 
-// queue
-const addPlayerToQueue = (socketId)=>{
-	if (playerQueue.indexOf(socketId) === -1) {
+/*
+	 ██████╗ ██╗   ██╗███████╗██╗   ██╗███████╗
+	██╔═══██╗██║   ██║██╔════╝██║   ██║██╔════╝
+	██║   ██║██║   ██║█████╗  ██║   ██║█████╗
+	██║▄▄ ██║██║   ██║██╔══╝  ██║   ██║██╔══╝
+	╚██████╔╝╚██████╔╝███████╗╚██████╔╝███████╗
+	 ╚══▀▀═╝  ╚═════╝ ╚══════╝ ╚═════╝ ╚══════╝
+*/
+function addPlayerToQueue(socketId){
+	const isAlreadyInQueue = playerQueue.indexOf(socketId) !== -1;
+	const isAlreadyPlaying = getPlayerNumber(socketId) !== -1;
+
+	if (!isAlreadyInQueue && !isAlreadyPlaying) {
 		playerQueue.push(socketId);
 	}
-};
-const removePlayerFromQueue = (socketId) => {
+}
+function removePlayerFromQueue(socketId) {
 	playerQueue = playerQueue.filter(id => id === socketId);
-};
+}
 
 
-// playing
-const newPlayer = (which, socketId) => {
-	if (currentPlayers.indexOf(socketId) === -1) {
-		currentPlayers[which] = socketId;
+/*
+	██████╗ ██╗      █████╗ ██╗   ██╗███████╗██████╗ ███████╗
+	██╔══██╗██║     ██╔══██╗╚██╗ ██╔╝██╔════╝██╔══██╗██╔════╝
+	██████╔╝██║     ███████║ ╚████╔╝ █████╗  ██████╔╝███████╗
+	██╔═══╝ ██║     ██╔══██║  ╚██╔╝  ██╔══╝  ██╔══██╗╚════██║
+	██║     ███████╗██║  ██║   ██║   ███████╗██║  ██║███████║
+	╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝╚═╝  ╚═╝╚══════╝
+*/
+function setPlayer(which, socketId) {
+	currentPlayers[which] = socketId;
+
+	if (which === 0){
+		timeStart = Date.now();
 	}
-};
-const removePlayer = (socketId) => {
-	currentPlayers = currentPlayers.filter(id => id === socketId);
-};
-const getPlayer = (which) => {
+
+	// remove the player from the queue, if they were in there at all
+	removePlayerFromQueue(socketId);
+}
+function removePlayerBySocket(socketId) {
+	for(var joypad in currentPlayers){
+		if (currentPlayers.hasOwnProperty(joypad)){
+			if(currentPlayers[joypad] === socketId) {
+				delete currentPlayers[joypad];
+			}
+		}
+	}
+}
+function unplugJoypad(which) {
+	delete currentPlayers[which];
+}
+
+function getPlayerForJoypad(which) {
 	return currentPlayers[which];
-};
-const getPlayerNumber = (socketId) => {
-	return currentPlayers.findIndex(id === socketId);
-};
+}
+function getPlayerNumber(socketId) {
+	var found = -1;
+	for(var joypad in currentPlayers){
+		if (currentPlayers[joypad] === socketId) {
+			found = joypad;
+		}
+	}
+	return found;
+}
 
-var tickTimer;
-const tick = () => {
-	const firstPlayer = getPlayer(0);
-	firstPlayer && emitTo(playerSocket, 'state:request', null, 'Requesting: P1 State');
+function isPlayerOne(socketId) {
+	return getPlayerNumber(socketId) === 0;
+}
+function isPlayerTwo(socketId) {
+	return getPlayerNumber(socketId) === 1;
+}
 
-	updateAllGameStates();
+/**
+	███████╗ ██████╗  ██████╗██╗  ██╗███████╗████████╗
+	██╔════╝██╔═══██╗██╔════╝██║ ██╔╝██╔════╝╚══██╔══╝
+	███████╗██║   ██║██║     █████╔╝ █████╗     ██║
+	╚════██║██║   ██║██║     ██╔═██╗ ██╔══╝     ██║
+	███████║╚██████╔╝╚██████╗██║  ██╗███████╗   ██║
+	╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝   ╚═╝
+*/
 
-	setTimeout(tick, 1000);
-};
-
-
-
-// setInterval(updateAllGameStates, 1000);
-
-const onConnect = (socket, socketId)=>{
-	console.log(`new connection - ${socketId}`);
+function onConnect(socket, socketId) {
+	console.log(`New connection - ${socketId.slice(0, 7)}...`);
 	addConnection(socketId);
 	updateSocketRoster(socketId, socket);
 
 	// if we have a loaded rom, send it down the line
-	sendRomToPlayer(socket, socketId);
+	transmitRom(socket, socketId);
 	// update with the last saved state
-	emitTo(socket, 'info:update', getGameStateInfo(socketId));
-};
+	emitTo(socket, 'info:update', getSocketState(socketId));
+}
 
-
-io.on('connection', (socket) =>{
-	const socketId = `${socket.handshake.address}-${socket.id}`;
-
-	socket.on('disconnect', ()=>{
-		removeConnection(socketId);
-		removePlayerFromQueue(socketId);
-		removePlayer(socketId);
-	});
-
-
+function bindSocketEvents(socket, socketId) {
+	/**
+	 * Socket has sent a gamestate update from its local emulator.
+	 */
 	socket.on('state:update', (data)=>{
 		addIncomingBandwidth(data);
-		const state = data.state;
 
+		if (!isPlayerOne(socketId)){
+			var playerNum = getPlayerNumber(socketId);
+			console.warn(`WARNING: ${socketId} attempted to send state update but is player ${playerNum}`);
+			return;
+		}
+
+		var state = data.state;
 		lastState = Object.assign({}, state);
 	});
 
+	/**
+	 * Socket as joined/left the 'i'd like to play' queue
+	 */
 	socket.on('queue:join', () => addPlayerToQueue(socketId));
-
 	socket.on('queue:leave', () => removePlayerFromQueue(socketId));
 
-	socket.on('queue:status', () => emitTo(socket, 'info:update', getGameStateInfo(socketId)));
-
+	/**
+	 * Socket has successfully loaded the ROM that was sent to it.
+	 */
 	socket.on('rom:loaded', ()=>{
 		if (lastState) {
 	  		emitTo(socket, 'state:update', lastState, 'Emitting state:update', true);
@@ -177,38 +231,148 @@ io.on('connection', (socket) =>{
 	});
 
 
-	// when the client emits 'new message', this listens and executes
-	socket.on('input:down', (buttonPressed) => {
-		addIncomingBandwidth(buttonPressed);
-		const playerNumber = getPlayerNumber(socketId);
-		if (playerNumber === -1) {
-			return;
-		}
+	/**
+	 * `input:[up|down]` - Socket has reported a player pressed a key locally.
+	 * Event is then immediately broadcast to the rest of the sockets.
+	 */
+	const onJoypadInput = (name) =>
+		(button) => {
+			addIncomingBandwidth(button);
 
-		const eventData = {joypadButton: buttonPressed, player: playerNumber};
-      	emitTo(socket.broadcast, 'input:down', eventData, 'Emitting input:down', true);
+			if (!isPlayerOne(socketId)){
+				return;
+			}
+
+			var eventData = {joypadButton: button, player: playerNumber};
+	      	emitTo(socket.broadcast, name, eventData, `Emitting ${name}`, true);
+		};
+
+	socket.on('input:down', onJoypadInput('input:down'));
+	socket.on('input:up', onJoypadInput('input:up'));
+
+
+	/**
+	 * Disconnected
+	 */
+	socket.on('disconnect', ()=>{
+		// remove from the audience list
+		removeConnection(socketId);
+		// remove from the waiting queue
+		removePlayerFromQueue(socketId);
+		// remove from active players
+		removePlayerBySocket(socketId);
 	});
+}
 
-	socket.on('input:up', (buttonDepressed) => {
-		addIncomingBandwidth(buttonDepressed);
-		const playerNumber = getPlayerNumber(socketId);
-		if (playerNumber === -1) {
-			return;
-		}
+/*
+	███████╗████████╗ █████╗ ████████╗███████╗
+	██╔════╝╚══██╔══╝██╔══██╗╚══██╔══╝██╔════╝
+	███████╗   ██║   ███████║   ██║   █████╗
+	╚════██║   ██║   ██╔══██║   ██║   ██╔══╝
+	███████║   ██║   ██║  ██║   ██║   ███████╗
+	╚══════╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝   ╚══════╝
+*/
 
-		const eventData = {joypadButton: buttonDepressed, player: playerNumber};
-      	emitTo(socket.broadcast, 'input:up', eventData, 'Emitting input:up', true);
+/**
+ * Determines when the current P1 started playing and determines how much
+ * time is left in their turn.
+ *
+ * @return {Number} Time left in current player's turn
+ */
+function getTurnTimeRemaining() {
+	var elapsedTime = timeStart ? (Date.now() - timeStart) : 0;
+	var timeLeft = (minsPerTurn * 60) - elapsedTime;
+	return playerQueue.length ? timeLeft : 0;
+}
+
+function socketToPlayerName(socketId) {
+	var playerName;
+	if (socketRoster[socketId]) {
+		playerName = socketRoster[socketId].name || '[no name]';
+	}
+	return playerName;
+}
+
+function getCurrentPlayerList() {
+	return Object.keys(currentPlayers).map((joypad) => currentPlayers[joypad]);
+}
+
+function getSocketState(socketId) {
+	return {
+		session: {
+			timeLeft: getTurnTimeRemaining(),
+			players: getCurrentPlayerList().map(socketToPlayerName),
+		},
+		audience: {
+			list: connected.map(socketToPlayerName),
+			size: connected.length,
+		},
+		queue: {
+			inQueue: playerQueue.indexOf(socketId) !== -1,
+			list: playerQueue.map(socketToPlayerName),
+			size: playerQueue.length,
+			position: playerQueue.indexOf(socketId),
+		},
+	};
+}
+
+function updateAllGameStates() {
+	connected.forEach(socketId => {
+		emitTo(socketRoster[socketId].socket, 'info:update', getSocketState(socketId), `Emitting info:update to ${socketId}`);
 	});
+};
 
+var tickTimer;
+var tick = () => {
+	var firstPlayer = getPlayerForJoypad(0);
+
+	// if the first player is out of time, just unplug them so someone else can
+	// step in
+	if (firstPlayer && getTurnTimeRemaining() <= 0){
+		unplugJoypad(0);
+	}
+
+	// if we don't have a first player but have a playerQueue, plug in
+	// the new player to P1
+	if (!firstPlayer && playerQueue.length) {
+		setPlayer(0, playerQueue[0]);
+	}
+
+	firstPlayer && emitTo(playerSocket, 'state:request', null, 'Requesting: P1 State');
+
+	updateAllGameStates();
+
+	tickTimer = setTimeout(tick, 1000);
+}
+
+
+/*
+	███████╗████████╗ █████╗ ██████╗ ████████╗██╗   ██╗██████╗
+	██╔════╝╚══██╔══╝██╔══██╗██╔══██╗╚══██╔══╝██║   ██║██╔══██╗
+	███████╗   ██║   ███████║██████╔╝   ██║   ██║   ██║██████╔╝
+	╚════██║   ██║   ██╔══██║██╔══██╗   ██║   ██║   ██║██╔═══╝
+	███████║   ██║   ██║  ██║██║  ██║   ██║   ╚██████╔╝██║
+	╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝
+*/
+
+/**
+ * Socket.io `connection` event handler. Basically accepts the new socket,
+ * determines an id for it, and then binds events/sends initial data.
+ */
+io.on('connection', (socket) =>{
+	var socketId = `${socket.handshake.address}-${socket.id}`;
+
+	bindSocketEvents(socket, socketId);
 	onConnect(socket, socketId);
 });
 
-
+// Server kick-off
 io.listen(3001);
 
-
+// This will eventually be removed, but currently on startup the server just spins
+// up a ROM and then distributes it to the audience, then begins to `tick`.
 loadRom('Super Mario Bros.', path.resolve(__dirname, '../../nES6/app/roms/SuperMarioBros.nes'))
-	.then(sendRomToPlayers)
+	.then(sendRomToConnected)
 	.then(rom=>{
 		var name = rom.name;
 		var data = rom.data;
