@@ -1,8 +1,8 @@
 import { combineReducers } from 'redux';
 // import { routerReducer } from 'react-router-redux';
 
-import player from './playerReducer';
+import socket from './socketReducer';
 
 export default combineReducers({
-  player,
+  socket,
 });

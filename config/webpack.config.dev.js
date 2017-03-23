@@ -6,6 +6,7 @@ var InterpolateHtmlPlugin = require('react-dev-utils/InterpolateHtmlPlugin');
 var WatchMissingNodeModulesPlugin = require('react-dev-utils/WatchMissingNodeModulesPlugin');
 var getClientEnvironment = require('./env');
 var paths = require('./paths');
+var path = require('path');
 
 
 
@@ -76,7 +77,13 @@ module.exports = {
     alias: {
       // Support React Native Web
       // https://www.smashingmagazine.com/2016/08/a-glimpse-into-the-future-with-react-native-for-web/
-      'react-native': 'react-native-web'
+      'react-native': 'react-native-web',
+      'components': path.resolve(__dirname, '../src/components'),
+      'css': path.resolve(__dirname, '../src/css'),
+      'assets': path.resolve(__dirname, '../src/assets'),
+      'actions': path.resolve(__dirname, '../src/actions'),
+      'nES6': path.resolve(__dirname, '../../nES6/src/nES6.js'),
+      'server': path.resolve(__dirname, '../server')
     }
   },
 
@@ -159,6 +166,7 @@ module.exports = {
   // We use PostCSS for autoprefixing only.
   postcss: function() {
     return [
+      require('postcss-nested'),
       autoprefixer({
         browsers: [
           '>1%',

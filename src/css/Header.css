@@ -1,0 +1,14 @@
+.logo {
+  margin-right: 0.5em;
+  max-height: 90%;
+  max-width: 50px;
+}
+
+
+.pt-navbar-group.pt-align-left {
+  width: 25%;
+}
+
+.pt-navbar-heading small {
+	white-space: nowrap;
+}
