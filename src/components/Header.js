@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import { connect } from 'react-redux';
 import logo from 'assets/nes.png';
 import 'css/Header.css';
 
@@ -12,7 +13,7 @@ import {
   Position,
 } from '@blueprintjs/core';
 
-export default class Header extends Component {
+class Header extends Component {
   constructor(props) {
     super(props);
     this.state = {};
@@ -168,3 +169,19 @@ export default class Header extends Component {
     );
   }
 }
+
+
+const mapStateToProps = ({ socket }) => ({ socket });
+
+const mapDispatchToProps = (dispatch) => {
+  return {
+    wooFunc: () => {
+      dispatch(()=>{});
+    }
+  }
+}
+
+export default connect(
+  mapStateToProps,
+  mapDispatchToProps
+)(Header);

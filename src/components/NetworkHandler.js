@@ -4,6 +4,11 @@ import { setSocket } from 'actions/socketActions';
 import { connect } from 'react-redux';
 import LZString from 'lz-string';
 
+import {
+  SERVER_SEND_ROM_BINARY, SERVER_SEND_GAME_STATE, SERVER_SEND_INPUT_DOWN,
+  SERVER_SEND_INPUT_UP, SERVER_SEND_INFO, SERVER_REQUEST_CLIENT_GAME_STATE
+} from '../../server/index.js';
+
 class NetworkHandler extends Component {
   static serialize(cb) {
     return (data) =>
@@ -39,9 +44,9 @@ class NetworkHandler extends Component {
 
   bindSocket(socket) {
     // For each event, deserialize the data and then trigger the parent handler
-    [ 'connect', 'rom:data', 'state:update', 'input:down',
-      'input:up', 'info:update', 'state:request'
-    ].map(event => socket.on(event, NetworkHandler.deserialize(data => this.props.onSocketEvent(event, data))));
+    [ 'connect', SERVER_SEND_ROM_BINARY, SERVER_SEND_GAME_STATE, SERVER_SEND_INPUT_DOWN,
+      SERVER_SEND_INPUT_UP, SERVER_SEND_INFO, SERVER_REQUEST_CLIENT_GAME_STATE
+    ].map(event => socket.on(event, NetworkHandler.deserialize(data => this.props.onEvent(event, data))));
   }
 
   render() {

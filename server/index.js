@@ -7,6 +7,23 @@ var emitTo = utils.emitTo;
 var loadRom = utils.loadRom;
 var addIncomingBandwidth = utils.addIncomingBandwidth;
 
+import {
+	SERVER_SEND_INFO,
+	SERVER_SEND_GAME_STATE,
+	SERVER_SEND_ROM_BINARY,
+	CLIENT_SEND_GAME_STATE,
+	CLIENT_JOINED_QUEUE,
+	CLIENT_LEFT_QUEUE,
+	CLIENT_REQUESTED_ROM,
+	CLIENT_LOADED_ROM,
+	CLIENT_SEND_INPUT_DOWN,
+	CLIENT_SEND_INPUT_UP,
+	SERVER_SEND_INPUT_DOWN,
+	SERVER_SEND_INPUT_UP,
+	SERVER_REQUEST_CLIENT_GAME_STATE,
+} from './constants.js';
+
+
 /*
 	███████╗███████╗████████╗██╗   ██╗██████╗
 	██╔════╝██╔════╝╚══██╔══╝██║   ██║██╔══██╗
@@ -50,7 +67,7 @@ function transmitRom(target, targetId) {
 	}
 
 	emitTo(target,
-		'rom:data',
+		SERVER_SEND_ROM_BINARY,
 		{
 			rom: currentRom.data,
 			name: currentRom.name,
@@ -195,14 +212,14 @@ function onConnect(socket, socketId) {
 	// if we have a loaded rom, send it down the line
 	transmitRom(socket, socketId);
 	// update with the last saved state
-	emitTo(socket, 'info:update', getSocketState(socketId));
+	emitTo(socket, SERVER_SEND_INFO, getSocketState(socketId));
 }
 
 function bindSocketEvents(socket, socketId) {
 	/**
-	 * Socket has sent a gamestate update from its local emulator.
+	 * Client has sent a gamestate update from its local emulator.
 	 */
-	socket.on('state:update', (data)=>{
+	socket.on(CLIENT_SEND_GAME_STATE, (data)=>{
 		addIncomingBandwidth(data);
 
 		if (!isPlayerOne(socketId)){
@@ -216,18 +233,25 @@ function bindSocketEvents(socket, socketId) {
 	});
 
 	/**
-	 * Socket as joined/left the 'i'd like to play' queue
+	 * Client as joined/left the 'i'd like to play' queue
 	 */
-	socket.on('queue:join', () => addPlayerToQueue(socketId));
-	socket.on('queue:leave', () => removePlayerFromQueue(socketId));
+	socket.on(CLIENT_JOINED_QUEUE, () => addPlayerToQueue(socketId));
+	socket.on(CLIENT_LEFT_QUEUE, () => removePlayerFromQueue(socketId));
 
 	/**
-	 * Socket has successfully loaded the ROM that was sent to it.
+	 * Client has successfully loaded the ROM that was sent to it.
 	 */
-	socket.on('rom:loaded', ()=>{
+	socket.on(CLIENT_LOADED_ROM, ()=>{
 		if (lastState) {
-	  		emitTo(socket, 'state:update', lastState, 'Emitting state:update', true);
+	  		emitTo(socket, SERVER_SEND_GAME_STATE, lastState, `Emitting ${SERVER_SEND_GAME_STATE}`, true);
 		}
+	});
+
+	/**
+	 * Client requested the ROM binary
+	 */
+	socket.on(CLIENT_REQUESTED_ROM, ()=>{
+		transmitRom(socket, socketId);
 	});
 
 
@@ -247,8 +271,8 @@ function bindSocketEvents(socket, socketId) {
 	      	emitTo(socket.broadcast, name, eventData, `Emitting ${name}`, true);
 		};
 
-	socket.on('input:down', onJoypadInput('input:down'));
-	socket.on('input:up', onJoypadInput('input:up'));
+	socket.on(CLIENT_SEND_INPUT_DOWN, onJoypadInput(SERVER_SEND_INPUT_DOWN));
+	socket.on(CLIENT_SEND_INPUT_UP, onJoypadInput(SERVER_SEND_INPUT_UP));
 
 
 	/**
@@ -318,7 +342,7 @@ function getSocketState(socketId) {
 
 function updateAllGameStates() {
 	connected.forEach(socketId => {
-		emitTo(socketRoster[socketId].socket, 'info:update', getSocketState(socketId), `Emitting info:update to ${socketId}`);
+		emitTo(socketRoster[socketId].socket, SERVER_SEND_INFO, getSocketState(socketId), `Emitting info:update to ${socketId}`);
 	});
 };
 
@@ -338,7 +362,7 @@ var tick = () => {
 		setPlayer(0, playerQueue[0]);
 	}
 
-	firstPlayer && emitTo(playerSocket, 'state:request', null, 'Requesting: P1 State');
+	firstPlayer && emitTo(firstPlayer, SERVER_REQUEST_CLIENT_GAME_STATE, null, 'Requesting: P1 State');
 
 	updateAllGameStates();
 
@@ -386,3 +410,23 @@ loadRom('Super Mario Bros.', path.resolve(__dirname, '../../nES6/app/roms/SuperM
 		// kick off
 		tick();
 	});
+
+
+module.exports = {
+	SERVER_SEND_INFO,
+	SERVER_SEND_GAME_STATE,
+	SERVER_SEND_ROM_BINARY,
+
+	CLIENT_SEND_GAME_STATE,
+	CLIENT_JOINED_QUEUE,
+	CLIENT_LEFT_QUEUE,
+	CLIENT_REQUESTED_ROM,
+	CLIENT_LOADED_ROM,
+	CLIENT_SEND_INPUT_DOWN,
+	CLIENT_SEND_INPUT_UP,
+
+	SERVER_SEND_INPUT_DOWN,
+	SERVER_SEND_INPUT_UP,
+
+	SERVER_REQUEST_CLIENT_GAME_STATE,
+};
