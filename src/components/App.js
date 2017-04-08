@@ -102,9 +102,11 @@ export default class App extends Component {
       case SERVER_SEND_ROM_BINARY:
         nes.loadRomFromBinary(data.rom.data, data.name);
 
+
         this.setState({
           ...this.state,
           game: {
+            ...this.state.game,
             isLoaded: true,
             name: data.name,
           },
@@ -124,7 +126,22 @@ export default class App extends Component {
       case SERVER_SEND_INFO:
         this.setState({
           ...this.state,
-          ...data,
+          game: {
+            ...this.state.game,
+            ...data.game,
+          },
+          session: {
+            ...this.state.session,
+            ...data.session,
+          },
+          audience: {
+            ...this.state.audience,
+            ...data.audience,
+          },
+          queue: {
+            ...this.state.queue,
+            ...data.queue,
+          },
         });
         break;
       case SERVER_REQUEST_CLIENT_GAME_STATE:
@@ -150,6 +167,7 @@ export default class App extends Component {
           this.setState({
             ...this.state,
             game: {
+              ...this.state.game,
               isLoaded: true,
               name,
             },
@@ -204,7 +222,7 @@ export default class App extends Component {
         }
 
         <Emulator ref={(emu)=>{this.emulator = emu && emu.instance;}} />
-        <KiwiChat className={this.state.game.isLoaded && 'has-game'} />
+        <KiwiChat className={this.state.game.isLoaded ? 'has-game' : ''} />
         <NetworkHandler
           onSocket={this.handleSetSocket}
           onEvent={this.handleNetworkOperation}

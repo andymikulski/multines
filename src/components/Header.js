@@ -88,7 +88,7 @@ export default class Header extends Component {
     const isInQueue = queue.inQueue;
     const isIoBroken = !!networkError;
     const isPlayerOne = session.playerNo === 0;
-    const queueNumber = queue.position;
+    const queueNumber = queue.position + 1;
     const totalQueue = queue.size;
     const totalAudience = audience.size;
     const displayedTime = Header.formatTimeToHumanReadable(session.timeLeft || 0);

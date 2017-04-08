@@ -90,7 +90,7 @@ module.exports = {
       'assets': path.resolve(__dirname, '../src/assets'),
       'actions': path.resolve(__dirname, '../src/actions'),
       'nES6': path.resolve(__dirname, '../../nES6/src/nES6.js'),
-      'server': path.resolve(__dirname, '../server')
+      'server': path.resolve(__dirname, '../src/server')
     }
   },
 
