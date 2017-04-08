@@ -1,7 +1,6 @@
 // eslint-disable-next-line
 import React, { Component } from 'react';
 // import { setSocket } from 'actions/socketActions';
-import { connect } from 'react-redux';
 import LZString from 'lz-string';
 
 import {
@@ -10,7 +9,7 @@ import {
   SERVER_PING, CLIENT_PONG,
 } from 'server/constants.js';
 
-class NetworkHandler extends Component {
+export default class NetworkHandler extends Component {
   static serialize(data) {
     return LZString.compressToUTF16(JSON.stringify(data || null));
   };
@@ -63,11 +62,3 @@ class NetworkHandler extends Component {
     return null;
   }
 }
-
-const mapStateToProps = ({ socket }) => ({ socket });
-const mapDispatchToProps = (dispatch) => ({ });
-
-export default connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(NetworkHandler);

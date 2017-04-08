@@ -9,7 +9,8 @@ var paths = require('./paths');
 var path = require('path');
 var getClientEnvironment = require('./env');
 
-
+require("babel-core/register");
+require("babel-polyfill");
 
 // Webpack uses `publicPath` to determine where the app is being served from.
 // It requires a trailing slash, or the file assets will get an incorrect path.
@@ -53,6 +54,7 @@ module.exports = {
   devtool: 'source-map',
   // In production, we only want to load the polyfills and the app code.
   entry: [
+    'babel-polyfill',
     require.resolve('./polyfills'),
     paths.appIndexJs
   ],

@@ -36,8 +36,49 @@ body {
 .nes6-player {
   position: fixed;
   top: 50%;
-  left: 50%;
-  max-height: 50vh;
-  max-width: 50vw;
+  left: calc(50% - 17vw);
+  width: 50vw;
   transform: translate(-50%, -50%);
+  max-width: 85vh;
+}
+
+.irc-chat {
+  position: absolute;
+  height: calc(100% - 50px);
+  right: 0px;
+  top: 50px;
+  bottom: 0px;
+  min-width: 420px;
+  border: none;
+  width: 27vw;
+  z-index: 1;
+}
+
+@media (max-width: 1200px) {
+  .nes6-player {
+    position: absolute;
+    top: calc(50px + 3vh);
+    transform: translateX(-50%);
+    left: 50%;
+    width: 62vh;
+    max-width: none;
+    min-height: 0;
+  }
+
+  .irc-chat {
+    position: relative;
+    margin-top: 9vh;
+
+    min-width: 0px;
+    width: 100vw;
+    top: 70%;
+    height: calc(100px + 35vmax);
+    bottom: auto;
+    min-height: 410px;
+  }
+
+  .irc-chat.has-game {
+    position: absolute;
+    margin-top: 0;
+  }
 }

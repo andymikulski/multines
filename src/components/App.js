@@ -1,18 +1,18 @@
 import React, { Component } from 'react';
-import { connect } from 'react-redux';
 import 'css/App.css';
 
 
 import bindKeyboardPlugin from '../../../nES6/src/plugins/bindKeyboard';
 import bindGamepadPlugin from '../../../nES6/src/plugins/bindGamepad';
 import dragDropLoader from '../../../nES6/src/plugins/dragDropLoader';
-import blurPausePlugin from '../../../nES6/src/plugins/blurPausePlugin';
+// import blurPausePlugin from '../../../nES6/src/plugins/blurPausePlugin';
 
 
 import NoServerMessage from 'components/NoServerMessage';
 import NetworkHandler from 'components/NetworkHandler';
 import Emulator from 'components/Emulator';
 import Header from 'components/Header';
+import KiwiChat from 'components/KiwiChat';
 
 import {
   SERVER_SEND_ROM_BINARY, SERVER_SEND_GAME_STATE, SERVER_SEND_INPUT_DOWN,
@@ -22,7 +22,7 @@ import {
   CLIENT_SEND_INPUT_DOWN, CLIENT_SEND_INPUT_UP,
 } from 'server/constants.js';
 
-class App extends Component {
+export default class App extends Component {
   constructor(props) {
     super(props);
     this.state = {
@@ -145,7 +145,6 @@ class App extends Component {
     nes.addPlugins([
       bindKeyboardPlugin(),
       bindGamepadPlugin(),
-      // blurPausePlugin(),
       dragDropLoader({
         onRomLoad: (name)=>{
           this.setState({
@@ -205,6 +204,7 @@ class App extends Component {
         }
 
         <Emulator ref={(emu)=>{this.emulator = emu && emu.instance;}} />
+        <KiwiChat className={this.state.game.isLoaded && 'has-game'} />
         <NetworkHandler
           onSocket={this.handleSetSocket}
           onEvent={this.handleNetworkOperation}
@@ -214,13 +214,3 @@ class App extends Component {
     );
   }
 }
-
-
-const mapStateToProps = () => ({ });
-
-const mapDispatchToProps = (dispatch) => ({});
-
-export default connect(
-  mapStateToProps,
-  mapDispatchToProps
-)(App);

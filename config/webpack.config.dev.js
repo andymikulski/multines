@@ -8,6 +8,8 @@ var getClientEnvironment = require('./env');
 var paths = require('./paths');
 var path = require('path');
 
+require("babel-core/register");
+require("babel-polyfill");
 
 
 // Webpack uses `publicPath` to determine where the app is being served from.
@@ -31,6 +33,7 @@ module.exports = {
   // This means they will be the "root" imports that are included in JS bundle.
   // The first two entry points enable "hot" CSS and auto-refreshes for JS.
   entry: [
+    'babel-polyfill',
     // Include an alternative client for WebpackDevServer. A client's job is to
     // connect to WebpackDevServer by a socket and get notified about changes.
     // When you save a file, the client will either apply hot updates (in case

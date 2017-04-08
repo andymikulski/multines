@@ -15,6 +15,7 @@
 
 .broken-io {
   color: #BFCCD6;
+  width: 69vw;
 
   h3 {
     color: #fff;
@@ -40,3 +41,8 @@
   }
 }
 
+@media (max-width: 1200px) {
+  .broken-io {
+    width: 100vw;
+  }
+}
