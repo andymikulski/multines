@@ -36,7 +36,7 @@ var connected = [];
 var socketRoster = {};
 var lastState;
 var timeStart;
-var minsPerTurn = 0.25;
+var minsPerTurn = 3;
 var currentRom = {};
 
 var currentPlayers = {
@@ -434,11 +434,13 @@ io.on('connection', (socket) =>{
 });
 
 // Server kick-off
-io.listen(3001);
+io.listen(process.env.PORT || 3001);
+
+console.log('Listening on port ' + (process.env.PORT || 3001));
 
 // This will eventually be removed, but currently on startup the server just spins
 // up a ROM and then distributes it to the audience, then begins to `tick`.
-loadRom('Super Mario Bros.', path.resolve(__dirname, './SuperMarioBros.nes'))
+loadRom('Dragon Warrior IV', path.resolve(__dirname, './DragonWarriorIV.nes'))
 	.then(sendRomToConnected)
 	.then(rom=>{
 		var name = rom.name;

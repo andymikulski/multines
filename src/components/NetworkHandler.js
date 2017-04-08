@@ -34,7 +34,7 @@ class NetworkHandler extends Component {
     }
 
     const io = window.io;
-    const socket = io('//localhost:3001/', {
+    const socket = io('//multines-server.herokuapp.com/', {
       transports: ['websocket'],
     });
 
