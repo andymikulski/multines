@@ -35,7 +35,7 @@ body {
 
 .nes6-player {
   position: fixed;
-  top: 50%;
+  top: calc(50px + 45%);
   left: calc(50% - 17vw);
   width: 50vw;
   transform: translate(-50%, -50%);

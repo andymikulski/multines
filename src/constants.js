@@ -12,5 +12,8 @@ export const CLIENT_SEND_INPUT_UP = 'client:input:up';
 
 export const SERVER_SEND_INPUT_DOWN = 'server:input:down';
 export const SERVER_SEND_INPUT_UP = 'server:input:up';
+export const SERVER_SEND_INPUT_RESET = 'server:input:reset';
 
 export const SERVER_REQUEST_CLIENT_GAME_STATE = 'server:state:request';
+
+export const CLIENT_UNPLUGGED = 'client:unplugged';

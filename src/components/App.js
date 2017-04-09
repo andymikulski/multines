@@ -1,4 +1,6 @@
 import React, { Component } from 'react';
+import cx from 'classnames';
+
 import 'css/App.css';
 
 
@@ -12,11 +14,12 @@ import NoServerMessage from 'components/NoServerMessage';
 import NetworkHandler from 'components/NetworkHandler';
 import Emulator from 'components/Emulator';
 import Header from 'components/Header';
-import KiwiChat from 'components/KiwiChat';
+import LobbyChat from 'components/LobbyChat';
 
 import {
   SERVER_SEND_ROM_BINARY, SERVER_SEND_GAME_STATE, SERVER_SEND_INPUT_DOWN,
-  SERVER_SEND_INPUT_UP, SERVER_SEND_INFO, SERVER_REQUEST_CLIENT_GAME_STATE,
+  SERVER_SEND_INPUT_UP, SERVER_SEND_INPUT_RESET,
+  SERVER_SEND_INFO, SERVER_REQUEST_CLIENT_GAME_STATE,
 
   CLIENT_SEND_GAME_STATE, CLIENT_REQUESTED_ROM, CLIENT_LOADED_ROM,
   CLIENT_SEND_INPUT_DOWN, CLIENT_SEND_INPUT_UP,
@@ -56,7 +59,9 @@ export default class App extends Component {
     this.handleSetSocket = ::this.handleSetSocket;
     this.onSessionTimerTick = ::this.onSessionTimerTick;
 
-    setInterval(this.onSessionTimerTick, 1000);
+    this.lobbyName = location.pathname.replace(/(^\/)|(\/$)/g, '') || '';
+
+    this.tickInterval = setInterval(this.onSessionTimerTick, 1000);
   }
 
   onSessionTimerTick() {
@@ -96,7 +101,6 @@ export default class App extends Component {
     switch(type){
       case 'connect':
         this.setupMultiPlayer();
-
         socket.emit(CLIENT_REQUESTED_ROM);
         break;
       case SERVER_SEND_ROM_BINARY:
@@ -123,6 +127,12 @@ export default class App extends Component {
       case SERVER_SEND_INPUT_UP:
         nes.depressControllerButton(data.player, data.joypadButton);
         break;
+      case SERVER_SEND_INPUT_RESET:
+        for(let joypadIndex = 0; joypadIndex < 8; joypadIndex++){
+          nes.depressControllerButton(0, joypadIndex);
+          nes.depressControllerButton(1, joypadIndex);
+        }
+        break;
       case SERVER_SEND_INFO:
         this.setState({
           ...this.state,
@@ -143,6 +153,11 @@ export default class App extends Component {
             ...data.queue,
           },
         });
+
+        // reset the timer so that it ticks down from the latest time
+        // the server sent (prevents the time changing every half second)
+        clearInterval(this.tickInterval);
+        this.tickInterval = setInterval(this.onSessionTimerTick, 1000);
         break;
       case SERVER_REQUEST_CLIENT_GAME_STATE:
         socket.emit(CLIENT_SEND_GAME_STATE, nes.exportState());
@@ -203,6 +218,9 @@ export default class App extends Component {
       }),
     ]);
     nes.setRenderer('auto');
+
+    // join remote lobby
+    this.socket.emit('join:lobby', this.lobbyName);
   }
 
   render() {
@@ -215,6 +233,7 @@ export default class App extends Component {
           queue={this.state.queue}
           game={this.state.game}
           socket={this.socket}
+          lobby={this.lobbyName}
         />
         {
           this.state.networkError && !this.state.game.isLoaded &&
@@ -222,7 +241,10 @@ export default class App extends Component {
         }
 
         <Emulator ref={(emu)=>{this.emulator = emu && emu.instance;}} />
-        <KiwiChat className={this.state.game.isLoaded ? 'has-game' : ''} />
+        <LobbyChat
+          lobby={this.lobbyName}
+          className={cx(this.state.game.isLoaded && 'has-game')}
+        />
         <NetworkHandler
           onSocket={this.handleSetSocket}
           onEvent={this.handleNetworkOperation}

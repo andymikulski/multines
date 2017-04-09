@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import cx from 'classnames';
 import logo from 'assets/nes.png';
 import 'css/Header.css';
 
@@ -13,16 +14,17 @@ import {
 } from '@blueprintjs/core';
 
 import {
-  CLIENT_JOINED_QUEUE, CLIENT_LEFT_QUEUE,
+  CLIENT_JOINED_QUEUE,
+  CLIENT_LEFT_QUEUE,
+  CLIENT_UNPLUGGED,
 } from 'server/constants.js';
 
 
 export default class Header extends Component {
-  static formatTimeToHumanReadable(duration) {
-    // const milliseconds = parseInt((duration%1000)/100);
-    const seconds = parseInt((duration/1000)%60, 10);
-    const minutes = parseInt((duration/(1000*60))%60, 10);
-    const hours = parseInt((duration/(1000*60*60))%24, 10);
+  static formatTimeToHumanReadable(durationMs) {
+    const seconds = parseInt((durationMs/1000)%60, 10);
+    const minutes = parseInt((durationMs/(1000*60))%60, 10);
+    const hours = parseInt((durationMs/(1000*60*60))%24, 10);
 
     const strHours = (hours < 10) ? `0${hours}` : hours;
     const strMinutes = (hours && minutes < 10) ? `0${minutes}` : minutes;
@@ -65,9 +67,21 @@ export default class Header extends Component {
 
   handleQueueChange() {
     const {
+      session,
       socket,
       queue,
     } = this.props;
+
+    const isPlayerOne = session.playerNo === 0;
+    const displayedTime = Header.formatTimeToHumanReadable(session.timeLeft || 0);
+
+    if (isPlayerOne){
+      if(window.confirm(`You have ${displayedTime} left to play. Are you sure you want to pass the controller?`)){
+        socket.emit(CLIENT_UNPLUGGED);
+      }
+
+      return;
+    }
 
     if (queue.inQueue) {
       socket.emit(CLIENT_LEFT_QUEUE);
@@ -83,6 +97,8 @@ export default class Header extends Component {
       game,
       audience,
       queue,
+      lobby,
+      socket,
     } = this.props;
 
     const isInQueue = queue.inQueue;
@@ -91,7 +107,11 @@ export default class Header extends Component {
     const queueNumber = queue.position + 1;
     const totalQueue = queue.size;
     const totalAudience = audience.size;
-    const displayedTime = Header.formatTimeToHumanReadable(session.timeLeft || 0);
+
+    const seshTimeLeft = session.timeLeft || 0;
+    const displayedTime = Header.formatTimeToHumanReadable(seshTimeLeft);
+    const secondsLeft = seshTimeLeft / 1000;
+    const isPlaytimeLow = seshTimeLeft > 0 && isPlayerOne && secondsLeft <= 30;
 
     return (
       <nav className="pt-navbar pt-dark">
@@ -100,33 +120,44 @@ export default class Header extends Component {
           <div className="pt-navbar-heading">
             MultiNES
             <small>
-              <span className="pt-navbar-divider" />
-              { game.name }
+              {
+                lobby &&
+                <span>
+                  <span className="pt-navbar-divider" />
+                  Lobby: <b>{ lobby }</b>
+                </span>
+              }
+              <span>
+                <span className="pt-navbar-divider" />
+                { game.name }
+              </span>
             </small>
           </div>
         </div>
         {
-          !isIoBroken &&
+          !isIoBroken && !!socket &&
           <div className="pt-navbar-group pt-align-right">
-            <Button disabled className="pt-minimal pt-icon-time" text={displayedTime} />
+            <span className="pt-navbar-divider" />
+            <Button className={cx('no-interaction', 'pt-minimal', 'pt-icon-time', isPlaytimeLow && 'warning')} text={displayedTime} title={'Time Left'} />
             <Button
-              disabled
-              className="pt-minimal pt-icon-people"
+              className="no-interaction pt-minimal pt-icon-people"
               text={`${isInQueue ? `${queueNumber} / ` : ''}${totalQueue}`}
+              title={isInQueue ? `You're number ${queueNumber} of ${totalQueue}` : `${totalQueue} ${totalQueue === 1 ? 'person is' : 'people are'} in line`}
             />
             <Button
-              disabled
-              className="pt-minimal pt-icon-eye-open"
+              className="no-interaction pt-minimal pt-icon-eye-open"
               text={`${totalAudience}`}
+              title={`${totalAudience} ${totalAudience === 1 ? 'person' : 'people'} watching`}
             />
+            <span className="pt-navbar-divider" />
 
             <Popover content={
               <div>
                 {
                   isPlayerOne &&
-                  <div>
+                  <h2>
                     You're currently playing!
-                  </div>
+                  </h2>
                 }
                 { isInQueue && !isPlayerOne ?
                   <div>
@@ -136,8 +167,16 @@ export default class Header extends Component {
                   </div>
                   :
                   <div>
-                    There are <b>{totalQueue}</b> people waiting in line.<br /><br />
-                    Estimated wait time is <b>{totalQueue * 2} minutes</b>
+                    { totalQueue > 0 ?
+                      <div>
+                        There are <b>{totalQueue}</b> people waiting in line.<br /><br />
+                        Estimated wait time is <b>{totalQueue * 2} minutes</b>
+                      </div>
+                      :
+                      <div>
+                        There is <b>NO LINE</b>! { !isPlayerOne ? 'Click to start playing!' : 'Your turn will continue until someone else wants to play.' }
+                      </div>
+                    }
                   </div>
                 }
               </div>}
@@ -145,15 +184,11 @@ export default class Header extends Component {
               popoverClassName="pt-popover-content-sizing"
               position={Position.BOTTOM_RIGHT.toString()}
               useSmartPositioning={false}>
-                <Button className={`pt-minimal pt-icon-hand ${ isInQueue ? 'pt-active' : ''}`} text={isPlayerOne ? 'NOW PLAYING' : (isInQueue ? 'Leave queue' : 'Get in line')} onClick={this.handleQueueChange} />
+                <Button
+                  className={cx('pt-minimal', 'pt-icon-hand', isInQueue && 'pt-active', isPlayerOne && 'now-playing')}
+                  text={isPlayerOne ? 'NOW PLAYING' : (isInQueue ? 'Leave queue' : 'Get in line')}
+                  onClick={this.handleQueueChange} />
             </Popover>
-
-            <span className="pt-navbar-divider" />
-            <Tooltip content={'Player Info'} position={Position.BOTTOM_RIGHT}>
-              <Button className="pt-minimal pt-icon-user" onClick={this.togglePlayerOverlay} />
-            </Tooltip>
-
-            <span className="pt-navbar-divider" />
           </div>
         }
 
@@ -161,67 +196,66 @@ export default class Header extends Component {
           <Tooltip content={'Help'} position={Position.BOTTOM_RIGHT}>
             <Button className="pt-minimal pt-icon-help" onClick={this.toggleHelpOverlay} />
           </Tooltip>
-          <Tooltip
-              isDisabled={this.state.hasTechInfo}
-              content={'Technical Info'}
-              position={Position.BOTTOM_RIGHT}>
-                <Popover
-                  isOpen={this.state.hasTechInfo}
-                  content={<div>This is the stats panel</div>}
-                  popoverClassName="pt-popover-content-sizing"
-                  position={Position.BOTTOM_RIGHT.toString()}
-                  useSmartPositioning={false}>
-                    <Button className="pt-minimal pt-icon-info-sign" onClick={this.toggleTechInfo} />
-                </Popover>
-            </Tooltip>
         </div>
+
         <Dialog
-            iconName="inbox"
-            isOpen={this.state.hasPlayerOverlay}
-            onClose={this.togglePlayerOverlay}
-            title="Player Info"
-        >
-            <div className="pt-dialog-body">
-              <div className="pt-input-group">
-                <input type="password" className="pt-input" placeholder="Enter your password..." />
-                <Button className="pt-minimal pt-icon-lock" />
-              </div>
-            </div>
-            <div className="pt-dialog-footer">
-                <div className="pt-dialog-footer-actions">
-                    <Button text="Secondary" />
-                    <Button
-                      intent={Intent.PRIMARY}
-                      onClick={this.togglePlayerOverlay}
-                      text="Primary"
-                    />
-                </div>
-            </div>
-        </Dialog>
-        <Dialog
-            iconName="inbox"
+            iconName="help"
             isOpen={this.state.hasHelpOverlay}
             onClose={this.toggleHelpOverlay}
             title="Help"
         >
             <div className="pt-dialog-body">
-              <h2>this is a thing</h2>
+              <h2>MultiNES Help Guide</h2>
 
+              <hr />
+
+              <h4>Controls</h4>
               <ul>
-                <li>Z - B</li>
-                <li>X - A</li>
-                <li>← - Left</li>
-                <li>↑ - Up</li>
-                <li>→ - Right</li>
-                <li>↓ - Down</li>
+                <li><b>D-Pad</b> - Arrow Keys (←↑→↓)</li>
+                <li><b>START</b> - Enter</li>
+                <li><b>SELECT</b> - C</li>
+                <li><b>B Button</b> - Z</li>
+                <li><b>A Button</b> - X</li>
               </ul>
+
+              <div style={{
+                background: 'rgba(0,0,0,0.051)',
+                padding: '1em',
+                borderRadius: '4px',
+              }}>
+                <b>Controls not working at all?</b>
+                <div>It's probably not your turn to play! Click <b>"GET IN LINE"</b> on the top of the page to start playing.</div>
+              </div>
+
+              <hr />
+
+              <h4>Laggy? Glitchy?</h4>
+              <div>
+                <p>Yep, that'll happen, sorry! Our servers do their best to keep everyone in sync, though if you're just watching (and not actively playing), it's likely that the game will appear choppy or glitchy.</p>
+                <p>We're actively working to smooth things out, so please bear with us as we improve the site. Thank you for your patience!</p>
+              </div>
+
+              <hr />
+
+              <h4>It's all one player games!</h4>
+              <div>
+                <p>Two-player support is coming soon!</p>
+              </div>
+
+              <hr />
+
+              <h6>Credit</h6>
+              <div>
+                <p>MultiNES was developed by <a href="mailto:andy.mikulski+multines@gmail.com">Andy Mikulski</a>, using <a href="https://github.com/andymikulski/nES6/tree/develop" target="_blank">nES6</a>.</p>
+              </div>
+
             </div>
             <div className="pt-dialog-footer">
                 <div className="pt-dialog-footer-actions">
                     <Button
                       intent={Intent.PRIMARY}
                       onClick={this.toggleHelpOverlay}
-                      text="oh ok"
+                      text="Close"
                     />
                 </div>
             </div>
