@@ -2,6 +2,8 @@
   margin-right: 0.5em;
   max-height: 90%;
   max-width: 50px;
+  position: relative;
+  top: -0.1em;
 }
 
 
@@ -49,4 +51,9 @@
 .pt-navbar button.no-interaction:focus {
   cursor: default !important;
   background: none !important;
+}
+
+.logo-title {
+  position: relative;
+  top: 0.1em;
 }

@@ -126,7 +126,7 @@ export default class Header extends Component {
         <div className="pt-navbar-group pt-align-left">
           <img alt="" src={ logo } className="logo" />
           <div className="pt-navbar-heading">
-            MultiNES
+            <span className="logo-title">MultiNES</span>
             <small>
               <span className="pt-navbar-divider" />
               <Button className="pt-minimal pt-small" onClick={this.handleLobbyChange}>
