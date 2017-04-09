@@ -61,7 +61,7 @@ body {
     transform: translateX(-50%);
     left: 50%;
     width: 62vh;
-    max-width: none;
+    max-width: 90vw;
     min-height: 0;
   }
 

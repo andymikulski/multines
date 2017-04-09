@@ -44,9 +44,9 @@
   }
 }
 
-.pt-navbar-group.pt-align-right button.no-interaction,
-.pt-navbar-group.pt-align-right button.no-interaction:hover,
-.pt-navbar-group.pt-align-right button.no-interaction:focus {
+.pt-navbar button.no-interaction,
+.pt-navbar button.no-interaction:hover,
+.pt-navbar button.no-interaction:focus {
   cursor: default !important;
   background: none !important;
 }

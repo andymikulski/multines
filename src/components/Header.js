@@ -45,6 +45,7 @@ export default class Header extends Component {
     this.toggleTechInfo = ::this.toggleTechInfo;
     this.togglePlayerOverlay = ::this.togglePlayerOverlay;
     this.handleQueueChange = ::this.handleQueueChange;
+    this.handleLobbyChange = ::this.handleLobbyChange;
   }
 
   toggleHelpOverlay () {
@@ -63,6 +64,13 @@ export default class Header extends Component {
     this.setState({
       hasPlayerOverlay: !this.state.hasPlayerOverlay,
     });
+  }
+
+  handleLobbyChange() {
+    const newLobby = window.prompt('Enter lobby name to join');
+    if (newLobby) {
+      location.hash = newLobby;
+    }
   }
 
   handleQueueChange() {
@@ -120,17 +128,14 @@ export default class Header extends Component {
           <div className="pt-navbar-heading">
             MultiNES
             <small>
-              {
-                lobby &&
-                <span>
-                  <span className="pt-navbar-divider" />
-                  Lobby: <b>{ lobby }</b>
-                </span>
-              }
-              <span>
-                <span className="pt-navbar-divider" />
+              <span className="pt-navbar-divider" />
+              <Button className="pt-minimal pt-small" onClick={this.handleLobbyChange}>
+                Lobby: <b>{ lobby || 'Main' }</b>
+              </Button>
+              <span className="pt-navbar-divider" />
+              <Button className="pt-minimal pt-small no-interaction">
                 { game.name }
-              </span>
+              </Button>
             </small>
           </div>
         </div>

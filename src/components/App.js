@@ -59,7 +59,15 @@ export default class App extends Component {
     this.handleSetSocket = ::this.handleSetSocket;
     this.onSessionTimerTick = ::this.onSessionTimerTick;
 
-    this.lobbyName = location.pathname.replace(/(^\/)|(\/$)/g, '') || '';
+    this.lobbyName = location.hash.replace('#', '') || ''; //location.pathname.replace(/(^\/)|(\/$)/g, '') || '';
+
+    // since we have to rely on hashes, we need to treat them as individual page routes,
+    // and it's easier to just force hard refreshes than to track which lobby to transfer to etc
+    window.onhashchange = function(event){
+      // force a hard reload to the new lobby
+      location.href = event.newURL;
+      location.reload(true);
+    };
 
     this.tickInterval = setInterval(this.onSessionTimerTick, 1000);
   }
