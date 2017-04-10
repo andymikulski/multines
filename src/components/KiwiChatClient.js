@@ -5,14 +5,14 @@ export default class KiwiChatClient extends React.Component {
   render() {
     const {
       server = 'irc.freenode.com',
-      channel = '##multines',
+      channel = '',
       className,
     } = this.props;
 
     return (
       <iframe
         className={cx('irc-chat', className)}
-        src={`https://kiwiirc.com/client/${server}/?&theme=relaxed${channel}`}
+        src={`https://kiwiirc.com/client/${server}/?&theme=relaxed${channel.replace(/\//g, '-')}`}
       />
     );
   }

@@ -11,6 +11,9 @@ module.exports = {
 	CLIENT_SEND_INPUT_UP: 'client:input:up',
 	CLIENT_UNPLUGGED: 'client:unplugged',
 
+	CLIENT_REQUEST_LOBBY_JOIN: 'client:lobby:join',
+	SERVER_CONFIRM_LOBBY_JOIN: 'server:lobby:join:confirm',
+
 	SERVER_SEND_INPUT_DOWN: 'server:input:down',
 	SERVER_SEND_INPUT_UP: 'server:input:up',
 	SERVER_SEND_INPUT_RESET: 'server:input:reset',

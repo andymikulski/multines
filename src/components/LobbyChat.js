@@ -11,12 +11,16 @@ export default class LobbyChat extends React.Component {
 
     // default to ##multines, but if we have a lobby name, append it
     // e.g. ##multiness-woo-test-lobby
-    const channel = `##multines${lobby ? `-${lobby}` : ''}`;
+    const channels = ['##multines', '##multines-help'];
+
+    if (lobby) {
+      channels.push(`##multines-${lobby}`);
+    }
 
     return (
       <KiwiChatClient
         className={cx(className)}
-        channel={channel}
+        channel={channels.join(',')}
       />
     );
   }

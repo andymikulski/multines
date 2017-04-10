@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import cx from 'classnames';
+import { Intent, Position, Toaster } from "@blueprintjs/core";
 
 import 'css/App.css';
 
@@ -22,8 +23,18 @@ import {
   SERVER_SEND_INFO, SERVER_REQUEST_CLIENT_GAME_STATE,
 
   CLIENT_SEND_GAME_STATE, CLIENT_REQUESTED_ROM, CLIENT_LOADED_ROM,
-  CLIENT_SEND_INPUT_DOWN, CLIENT_SEND_INPUT_UP,
+  CLIENT_SEND_INPUT_DOWN, CLIENT_SEND_INPUT_UP, CLIENT_REQUEST_LOBBY_JOIN,
+  SERVER_CONFIRM_LOBBY_JOIN
 } from 'server/constants.js';
+
+
+export const NotPlayingToaster = Toaster.create({
+  className: "not-playing-toast",
+  position: Position.BOTTOM_CENTER,
+  intent: Intent.primary,
+  autoFocus: true,
+  canEscapeKeyClear: true,
+});
 
 export default class App extends Component {
   constructor(props) {
@@ -97,6 +108,10 @@ export default class App extends Component {
     this.setupSinglePlayer();
   }
 
+  joinRemoteLobby(){
+    this.socket.emit(CLIENT_REQUEST_LOBBY_JOIN, this.lobbyName);
+  }
+
   handleNetworkOperation(type, data) {
     const socket = this.socket;
     const nes = this.emulator;
@@ -108,12 +123,14 @@ export default class App extends Component {
 
     switch(type){
       case 'connect':
+        this.joinRemoteLobby();
         this.setupMultiPlayer();
+        break;
+      case SERVER_CONFIRM_LOBBY_JOIN:
         socket.emit(CLIENT_REQUESTED_ROM);
         break;
       case SERVER_SEND_ROM_BINARY:
         nes.loadRomFromBinary(data.rom.data, data.name);
-
 
         this.setState({
           ...this.state,
@@ -202,6 +219,20 @@ export default class App extends Component {
     ]);
   }
 
+  showNotPlayingToast() {
+    const toasts = NotPlayingToaster.getToasts();
+
+    if (toasts.length){
+      return;
+    }
+
+    NotPlayingToaster.show({
+      icon: 'warning',
+      message: `You're not currently playing! You should get in line if you're interested in joining.`,
+      timeout: 2500,
+    });
+  }
+
   setupMultiPlayer() {
     const nes = this.emulator;
     if (!nes) {
@@ -212,6 +243,11 @@ export default class App extends Component {
     // if the user is actually currently playing or not.
     const keyMiddleware = (event) =>
       ({ joypadButton, next }) => {
+        if (this.state.session.playerNo < 0 && !this.state.queue.inQueue){
+          this.showNotPlayingToast();
+          return;
+        }
+
         if (this.state.session.isPlaying) {
           this.socket.emit(event, joypadButton);
           // calling `next` will apply the keypress to the local emulator
@@ -226,9 +262,6 @@ export default class App extends Component {
       }),
     ]);
     nes.setRenderer('auto');
-
-    // join remote lobby
-    this.socket.emit('join:lobby', this.lobbyName);
   }
 
   render() {

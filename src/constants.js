@@ -10,6 +10,9 @@ export const CLIENT_LOADED_ROM = 'client:rom:load';
 export const CLIENT_SEND_INPUT_DOWN = 'client:input:down';
 export const CLIENT_SEND_INPUT_UP = 'client:input:up';
 
+export const CLIENT_REQUEST_LOBBY_JOIN = 'client:lobby:join';
+export const SERVER_CONFIRM_LOBBY_JOIN = 'server:lobby:join:confirm';
+
 export const SERVER_SEND_INPUT_DOWN = 'server:input:down';
 export const SERVER_SEND_INPUT_UP = 'server:input:up';
 export const SERVER_SEND_INPUT_RESET = 'server:input:reset';

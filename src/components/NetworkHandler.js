@@ -6,7 +6,7 @@ import LZString from 'lz-string';
 import {
   SERVER_SEND_ROM_BINARY, SERVER_SEND_GAME_STATE, SERVER_SEND_INPUT_DOWN,
   SERVER_SEND_INPUT_UP, SERVER_SEND_INFO, SERVER_REQUEST_CLIENT_GAME_STATE,
-  SERVER_PING, CLIENT_PONG,
+  SERVER_PING, CLIENT_PONG, SERVER_CONFIRM_LOBBY_JOIN
 } from 'server/constants.js';
 
 export default class NetworkHandler extends Component {
@@ -44,7 +44,7 @@ export default class NetworkHandler extends Component {
 
   bindSocket(socket) {
     // For each event, deserialize the data and then trigger the parent handler
-    [ 'connect', SERVER_SEND_ROM_BINARY, SERVER_SEND_GAME_STATE, SERVER_SEND_INPUT_DOWN,
+    [ 'connect', SERVER_CONFIRM_LOBBY_JOIN, SERVER_SEND_ROM_BINARY, SERVER_SEND_GAME_STATE, SERVER_SEND_INPUT_DOWN,
       SERVER_SEND_INPUT_UP, SERVER_SEND_INFO, SERVER_REQUEST_CLIENT_GAME_STATE
     ].forEach(event => {
       // Bind each event, deserializing received data before firing the prop trigger

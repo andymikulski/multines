@@ -190,7 +190,7 @@ export default class Header extends Component {
               position={Position.BOTTOM_RIGHT.toString()}
               useSmartPositioning={false}>
                 <Button
-                  className={cx('pt-minimal', 'pt-icon-hand', isInQueue && 'pt-active', isPlayerOne && 'now-playing')}
+                  className={cx('pt-minimal', isPlayerOne ? 'pt-icon-star' : 'pt-icon-hand', isInQueue && 'pt-active', isPlayerOne && 'now-playing')}
                   text={isPlayerOne ? 'NOW PLAYING' : (isInQueue ? 'Leave queue' : 'Get in line')}
                   onClick={this.handleQueueChange} />
             </Popover>
@@ -251,7 +251,7 @@ export default class Header extends Component {
 
               <h6>Credit</h6>
               <div>
-                <p>MultiNES was developed by <a href="mailto:andy.mikulski+multines@gmail.com">Andy Mikulski</a>, using <a href="https://github.com/andymikulski/nES6/tree/develop" target="_blank">nES6</a>.</p>
+                <p>MultiNES was developed by <a href="mailto:andy.mikulski+multines@gmail.com">Andy Mikulski</a> using <a href="https://github.com/andymikulski/nES6/tree/develop" target="_blank">nES6</a>.</p>
               </div>
 
             </div>
