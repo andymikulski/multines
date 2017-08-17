@@ -8,11 +8,6 @@ body {
   font-family: 'Roboto', sans-serif;
 }
 
-.logo {
-  margin-right: 0.5em;
-}
-
-
 .App {
   text-align: center;
 }
@@ -38,38 +33,52 @@ body {
   to { transform: rotate(360deg); }
 }
 
-.king-hippo {
-  display: block;
-  margin: 10vh auto 2em;
-  /*max-height: 50vh;*/
-  max-width: 20em;
-  width: 40vmin;
-
-  image-rendering: pixelated;
-  image-rendering: -moz-crisp-edges;
-
-  -webkit-filter: drop-shadow(1px 1px 0px #5C7080);
-  -moz-filter: drop-shadow(1px 1px 0px #5C7080);
-  filter: drop-shadow(1px 1px 0px #5C7080);
-}
-
-.broken-io {
-  color: #BFCCD6;
-}
-
-.broken-io h3 {
-  color: #fff;
-  margin-bottom: calc(1em + 2vmin);
-}
-.broken-io span {
-  color: #5C7080;
-}
-
 .nes6-player {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  max-height: 50vh;
-  max-width: 50vw;
+  top: calc(50px + 45%);
+  left: calc(50% - 17vw);
+  width: 50vw;
   transform: translate(-50%, -50%);
+  max-width: 85vh;
+}
+
+.irc-chat {
+  position: absolute;
+  height: calc(100% - 50px);
+  right: 0px;
+  top: 50px;
+  bottom: 0px;
+  min-width: 420px;
+  border: none;
+  width: 27vw;
+  z-index: 1;
+}
+
+@media (max-width: 1200px) {
+  .nes6-player {
+    position: absolute;
+    top: calc(50px + 3vh);
+    transform: translateX(-50%);
+    left: 50%;
+    width: 62vh;
+    max-width: 90vw;
+    min-height: 0;
+  }
+
+  .irc-chat {
+    position: relative;
+    margin-top: 9vh;
+
+    min-width: 0px;
+    width: 100vw;
+    top: 70%;
+    height: calc(100px + 35vmax);
+    bottom: auto;
+    min-height: 410px;
+  }
+
+  .irc-chat.has-game {
+    position: absolute;
+    margin-top: 0;
+  }
 }

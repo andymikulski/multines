@@ -1,0 +1,59 @@
+.logo {
+  margin-right: 0.5em;
+  max-height: 90%;
+  max-width: 50px;
+  position: relative;
+  top: -0.1em;
+}
+
+
+.pt-navbar-group.pt-align-left {
+  width: 25%;
+}
+
+.pt-navbar-heading small {
+	white-space: nowrap;
+}
+
+
+.warning {
+  animation: warning-animation 1s infinite;
+  -webkit-animation: warning-animation 1s infinite;
+}
+@keyframes warning-animation {
+  to {
+    background: #DB3737;
+  }
+}
+@-webkit-keyframes warning-animation {
+  to {
+    background: #DB3737;
+  }
+}
+
+.now-playing {
+  animation: nowPlaying-animation 1s infinite;
+  -webkit-animation: nowPlaying-animation 1s infinite;
+}
+@keyframes nowPlaying-animation {
+  to {
+    background: #137CBD;
+  }
+}
+@-webkit-keyframes nowPlaying-animation {
+  to {
+    background: #137CBD;
+  }
+}
+
+.pt-navbar button.no-interaction,
+.pt-navbar button.no-interaction:hover,
+.pt-navbar button.no-interaction:focus {
+  cursor: default !important;
+  background: none !important;
+}
+
+.logo-title {
+  position: relative;
+  top: 0.1em;
+}

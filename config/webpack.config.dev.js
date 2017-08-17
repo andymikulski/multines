@@ -6,7 +6,10 @@ var InterpolateHtmlPlugin = require('react-dev-utils/InterpolateHtmlPlugin');
 var WatchMissingNodeModulesPlugin = require('react-dev-utils/WatchMissingNodeModulesPlugin');
 var getClientEnvironment = require('./env');
 var paths = require('./paths');
+var path = require('path');
 
+require("babel-core/register");
+require("babel-polyfill");
 
 
 // Webpack uses `publicPath` to determine where the app is being served from.
@@ -30,6 +33,7 @@ module.exports = {
   // This means they will be the "root" imports that are included in JS bundle.
   // The first two entry points enable "hot" CSS and auto-refreshes for JS.
   entry: [
+    'babel-polyfill',
     // Include an alternative client for WebpackDevServer. A client's job is to
     // connect to WebpackDevServer by a socket and get notified about changes.
     // When you save a file, the client will either apply hot updates (in case
@@ -76,7 +80,13 @@ module.exports = {
     alias: {
       // Support React Native Web
       // https://www.smashingmagazine.com/2016/08/a-glimpse-into-the-future-with-react-native-for-web/
-      'react-native': 'react-native-web'
+      'react-native': 'react-native-web',
+      'components': path.resolve(__dirname, '../src/components'),
+      'css': path.resolve(__dirname, '../src/css'),
+      'assets': path.resolve(__dirname, '../src/assets'),
+      'actions': path.resolve(__dirname, '../src/actions'),
+      'nES6': path.resolve(__dirname, '../../nES6/src/nES6.js'),
+      'server': path.resolve(__dirname, '../src/server')
     }
   },
 
@@ -159,6 +169,7 @@ module.exports = {
   // We use PostCSS for autoprefixing only.
   postcss: function() {
     return [
+      require('postcss-nested'),
       autoprefixer({
         browsers: [
           '>1%',
